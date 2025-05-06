@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: gym-analysis-toolkit
+Version: 0.1.0
+Summary: A toolkit to make episodic analysis of RL environments faster and easier
+Author: Nigel Swenson
+Requires-Python: >=3.6

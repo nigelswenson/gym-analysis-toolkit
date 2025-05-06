@@ -1,0 +1,7 @@
+This is a repo designed to speed up RL analysis by providing a custom lightweight way to record episodes during training
+and evaluate them graphically. To use, wrap a gym or gymnasium environment in a structuredDataWrapper which will save
+episodes to a folder during training and evaluation. Next use the custom pyqt GUI in the analysis folder to visualize
+your data. With this gui you can compare data over a single run, across multiple runs and more. Additionally, you can
+add plotting functions that you often use to custom buttons and save that config in the saved_configs folder.
+
+We have added an example saved config for the half-cheetah enviroment as an example.
