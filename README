@@ -4,4 +4,13 @@ episodes to a folder during training and evaluation. Next use the custom pyqt GU
 your data. With this gui you can compare data over a single run, across multiple runs and more. Additionally, you can
 add plotting functions that you often use to custom buttons and save that config in the saved_configs folder.
 
-We have added an example saved config for the half-cheetah enviroment as an example.
+We have added an example saved config for the half-cheetah enviroment.
+
+Currently available:
+Analysis gui for single episode plotting
+Gymnasium environment wrapper to allow for easy episode saving
+
+Upcoming:
+Updates to gui to allow for folder wide plotting
+Updates to gui to allow user to add buttons for commonly used plots
+Configs for more commonly used gymnasium environments
