@@ -23,6 +23,7 @@ class SelectionWidget(QWidget):
         self.max_btn = QRadioButton("Max")
         self.avg_btn = QRadioButton("Average")
         self.x_btn = QRadioButton("Specific Timestep")
+        self.min_btn.setChecked(True)
 
         self.x_input = QLineEdit()
         self.x_input.setPlaceholderText("Enter integer")
@@ -47,6 +48,17 @@ class SelectionWidget(QWidget):
         layout.addWidget(self.max_btn)
         layout.addWidget(self.avg_btn)
         layout.addLayout(x_layout)
+
+        self.episode_btn = QRadioButton("Episode")
+        self.timestep_btn = QRadioButton("Timestep")
+        self.episode_btn.setChecked(True)
+
+        self.agregation_button_group = QButtonGroup(self)
+        self.agregation_button_group.addButton(self.episode_btn)
+        self.agregation_button_group.addButton(self.timestep_btn)
+        layout.addWidget(QLabel("Aggregate across Timestep or Episode:"))
+        layout.addWidget(self.episode_btn)
+        layout.addWidget(self.timestep_btn)
         layout.addStretch()
         self.setLayout(layout)
 
@@ -73,6 +85,11 @@ class SelectionWidget(QWidget):
                 return "Timestep", None
         return None, None
 
+    def get_aggregation(self):
+        if self.episode_btn.isChecked():
+            return 'episode'
+        else:
+            return 'timestep'
 
 class AddButtonDialog(QDialog):
     def __init__(self, math_function):
@@ -127,7 +144,6 @@ class AddButtonDialog(QDialog):
             self.x_input.text()
         )
     
-
 def get_item_hierarchy_text(item):
     texts = []
     while item is not None:
@@ -154,12 +170,12 @@ class DataPlotApp(QWidget):
         tab2 = QWidget()
         tab3 = QWidget()
         tabs.addTab(tab1, "On the Fly Episode Plotting")
-        # tabs.addTab(tab2, "Multiprocess Loading")
+        tabs.addTab(tab2, "Multiprocess Loading")
         # tabs.addTab(tab3, "Premade Plot Functions")
         self.control_panel = QVBoxLayout()
         tab1.setLayout(self.control_panel)
 
-
+        self.loaded=False
         # Main layout
         main_layout = QHBoxLayout()
         self.setLayout(main_layout)
@@ -199,12 +215,12 @@ class DataPlotApp(QWidget):
 
         # Toggle switch for enabling complex options
         self.complex_toggle = QCheckBox("Folder Wide Plotting")
-        # self.control_panel.addWidget(self.complex_toggle)
+        self.control_panel.addWidget(self.complex_toggle)
 
         # The selection widget (initially disabled)
         self.selection_widget = SelectionWidget()
         self.selection_widget.setDisabled(True)
-        # self.control_panel.addWidget(self.selection_widget)
+        self.control_panel.addWidget(self.selection_widget)
 
         # Connect the toggle to enable/disable the selection widget
         self.complex_toggle.toggled.connect(self.selection_widget.setEnabled)
@@ -290,8 +306,8 @@ class DataPlotApp(QWidget):
         # Connections
         self.x_button.clicked.connect(self.set_x_axis)
         self.y_button.clicked.connect(self.set_y_axis)
-        plot_button.clicked.connect(self.plot_singular)
-        scatter_button.clicked.connect(lambda: self.plot_singular(scatter=True))
+        plot_button.clicked.connect(self.plot)
+        scatter_button.clicked.connect(lambda: self.plot(scatter=True))
         clear_button.clicked.connect(self.clear_plot)
         # Add a new section to hold per-line legend inputs
         self.line_legend_inputs_layout = QVBoxLayout()
@@ -344,6 +360,7 @@ class DataPlotApp(QWidget):
         episode_files = episode_files[sorted_inds].tolist()
         for fname in episode_files:
             self.file_list.addItem(fname)
+
     def load_selected_file(self, item):
         filename = os.path.join(self.data_folder, item.text())
         self.tree.clear()
@@ -378,17 +395,38 @@ class DataPlotApp(QWidget):
             parent_item.addChild(item)
 
     def set_x_axis(self):
-        
         item = self.tree.currentItem()
         if item:
             self.x_key = get_item_hierarchy_text(item)
-            self.x_label_display.setText(f"X Axis: {self.x_key[-1]}")
+            if self.complex_toggle.isChecked() and (self.x_key[-1] != 'Timesteps'):
+                function_key = self.selection_widget.get_selection()
+                aggregation_window = self.selection_widget.get_aggregation()
+                self.x_label_display.setText(f"X Axis: {self.x_key[-1]} {function_key[0]} {aggregation_window} agregation")
+                if aggregation_window == 'episode':
+                    self.x_key.append(function_key[0])
+                    if isinstance(function_key[1], int):
+                        self.x_key.append(function_key[1])
+                else:
+                    raise NotImplementedError('Havent added in timestep based agregation yet, should be added by 5/30/2025')
+            else:
+                self.x_label_display.setText(f"X Axis: {self.x_key[-1]}")
 
     def set_y_axis(self):
         item = self.tree.currentItem()
         if item:
             self.y_key = get_item_hierarchy_text(item)
-            self.y_label_display.setText(f"Y Axis: {self.y_key[-1]}")
+            if self.complex_toggle.isChecked() and (self.y_key[-1] != 'Timesteps'):
+                function_key = self.selection_widget.get_selection()
+                aggregation_window = self.selection_widget.get_aggregation()
+                self.y_label_display.setText(f"Y Axis: {self.y_key[-1]} {function_key[0]} {aggregation_window} agregation")
+                if aggregation_window == 'episode':
+                    self.y_key.append(function_key[0])
+                    if isinstance(function_key[1], int):
+                        self.y_key.append(function_key[1])
+                else:
+                    raise NotImplementedError('Havent added in timestep based agregation yet, should be added by 5/30/2025')
+            else:
+                self.y_label_display.setText(f"Y Axis: {self.y_key[-1]}")
 
     def show_add_button_dialog(self):
         dialog = AddButtonDialog(math_function=self.square_value)
@@ -413,15 +451,27 @@ class DataPlotApp(QWidget):
 
             self.tab3_layout.addWidget(new_button)
 
-    def plot_singular(self, scatter=False):
+    def plot(self, scatter=False):
+        folder_plotting = self.complex_toggle.isChecked()
         if not self.x_key or not self.y_key:
             QMessageBox.warning(self, "Missing Axis", "Please assign both X and Y axes.")
             return
 
         try:
-            x_data, y_data = self.backend.prepare_data_singular(self.x_key, self.y_key)
-            # Plot the data
-            print(x_data,y_data)
+            if folder_plotting:
+                if self.data_folder and not self.loaded:
+                    self.loaded = True
+                    self.backend.load_folder(self.data_folder,None)
+                if self.selection_widget.get_aggregation() == 'episode':
+                    # function_key = self.selection_widget.get_selection()
+                    # self.x_key.append(function_key[0])
+                    # if isinstance(function_key[1], int):
+                    #     self.x_key.append(function_key[1])
+                    # here we assume that the data is loaded and that xkey and ykey have the functions we need in it
+                    x_data, y_data = self.backend.prepare_data_multi(self.x_key, self.y_key)
+            else:
+                x_data, y_data = self.backend.prepare_data_singular(self.x_key, self.y_key)
+                # Plot the data
             if scatter:
                 line = self.ax.scatter(x_data, y_data, label='placeholder')
                 color = to_hex(line.get_facecolor()[0])
@@ -451,9 +501,6 @@ class DataPlotApp(QWidget):
             self.canvas.draw()
         except Exception as e:
             QMessageBox.critical(self, "Plot Error", str(e))
-
-    def scatter_singular(self):
-        pass
 
     def update_legends(self):
         # Update each line's legend from the corresponding input
